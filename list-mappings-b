@@ -1,0 +1,8 @@
+# Variables
+DOMAIN_NAME="api.dev.integration.appst.ambientesb.com"
+REGION="us-east-1"   # Ajusta si hace falta
+
+# 1) Listar mappings y mostrarlos (opcional)
+aws apigatewayv2 get-api-mappings \
+  --domain-name "$DOMAIN_NAME" \
+  --region "$REGION"
