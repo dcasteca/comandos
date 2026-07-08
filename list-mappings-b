@@ -1,5 +1,5 @@
 # Variables
-DOMAIN_NAME="api.dev.integration.appst.ambientesb.com"
+DOMAIN_NAME="api.dev.integration.appsb.entornosb.com"
 REGION="us-east-1"   # Ajusta si hace falta
 
 # 1) Listar mappings y mostrarlos (opcional)
