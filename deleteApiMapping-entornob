@@ -1,0 +1,20 @@
+#!/bin/bash
+# Variables
+DOMAIN_NAME="api.dev.integration.appsb.entornosb.com"
+REGION="us-east-1"   # Ajusta si hace falta
+APIMAPPING="xq8v34902c"   # Ajusta si hace falta
+
+# 1) Listar mappings y mostrarlos (opcional)
+aws apigatewayv2 get-api-mappings \
+  --domain-name "$DOMAIN_NAME" \
+  --region "$REGION"
+
+aws apigatewayv2 delete-api-mapping \
+  --domain-name "$DOMAIN_NAME" \
+  --api-mapping-id "$APIMAPPING" \
+  --region "$REGION"
+  
+aws apigatewayv2 get-api-mappings \
+  --domain-name "$DOMAIN_NAME" \
+  --region "$REGION"
+echo "✅ Completado para $DOMAIN_NAME"
