@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Variables
+DOMAIN_NAME="api.dev.integration.appst.ambientesbc.com"
+REGION="us-east-1"
+
+NEXT_TOKEN=""
+
+while true; do
+  if [ -z "$NEXT_TOKEN" ]; then
+    RESPONSE=$(aws apigatewayv2 get-api-mappings \
+      --domain-name "$DOMAIN_NAME" \
+      --region "$REGION")
+  else
+    RESPONSE=$(aws apigatewayv2 get-api-mappings \
+      --domain-name "$DOMAIN_NAME" \
+      --region "$REGION" \
+      --next-token "$NEXT_TOKEN")
+  fi
+
+  # Mostrar la página actual
+  echo "$RESPONSE"
+
+  # Obtener el siguiente token
+  NEXT_TOKEN=$(echo "$RESPONSE" | jq -r '.NextToken // empty')
+
+  # Si no hay más páginas, terminar
+  [ -z "$NEXT_TOKEN" ] && break
+done
