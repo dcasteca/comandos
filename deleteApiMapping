@@ -1,0 +1,19 @@
+# Variables
+DOMAIN_NAME="api.dev.integration.appst.ambientesbc.com"
+REGION="us-east-1"   # Ajusta si hace falta
+APIMAPPING="fy9cgn"   # Ajusta si hace falta
+
+# 1) Listar mappings y mostrarlos (opcional)
+aws apigatewayv2 get-api-mappings \
+  --domain-name "$DOMAIN_NAME" \
+  --region "$REGION"
+
+aws apigatewayv2 delete-api-mapping \
+  --domain-name "$DOMAIN_NAME" \
+  --api-mapping-id "$APIMAPPING" \
+  --region "$REGION"
+  
+aws apigatewayv2 get-api-mappings \
+  --domain-name "$DOMAIN_NAME" \
+  --region "$REGION"
+echo "✅ Completado para $DOMAIN_NAME"
