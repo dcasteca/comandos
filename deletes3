@@ -1,0 +1,3 @@
+aws s3api delete-bucket \
+  --bucket cdk-hnb659fds-assets-417570831362-us-east-1 \
+  --region us-east-1
