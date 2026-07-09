@@ -1,0 +1,56 @@
+#!/bin/bash
+set -e
+
+DOMAIN_NAME="$1"
+API_MAPPING_KEY="$2"
+REGION="${3:-us-east-1}"
+
+if [ -z "$DOMAIN_NAME" ] || [ -z "$API_MAPPING_KEY" ]; then
+    echo "Uso: $0 <domain-name> <api-mapping-key> [region]"
+    exit 1
+fi
+
+NEXT_TOKEN=""
+API_MAPPING_ID=""
+
+while true; do
+    if [ -z "$NEXT_TOKEN" ]; then
+        RESPONSE=$(aws apigatewayv2 get-api-mappings \
+            --domain-name "$DOMAIN_NAME" \
+            --region "$REGION")
+    else
+        RESPONSE=$(aws apigatewayv2 get-api-mappings \
+            --domain-name "$DOMAIN_NAME" \
+            --region "$REGION" \
+            --next-token "$NEXT_TOKEN")
+    fi
+
+    ID=$(echo "$RESPONSE" | jq -r \
+        --arg KEY "$API_MAPPING_KEY" \
+        '.Items[] | select(.ApiMappingKey == $KEY) | .ApiMappingId' | head -n1)
+
+    if [ -n "$ID" ]; then
+        API_MAPPING_ID="$ID"
+        break
+    fi
+
+    NEXT_TOKEN=$(echo "$RESPONSE" | jq -r '.NextToken // empty')
+
+    [ -z "$NEXT_TOKEN" ] && break
+done
+
+if [ -z "$API_MAPPING_ID" ]; then
+    echo "❌ No se encontró un API Mapping con la ruta '$API_MAPPING_KEY' en '$DOMAIN_NAME'"
+    exit 1
+fi
+
+echo "✅ Encontrado ApiMappingId: $API_MAPPING_ID"
+
+aws apigatewayv2 delete-api-mapping \
+    --domain-name "$DOMAIN_NAME" \
+    --api-mapping-id "$API_MAPPING_ID" \
+    --region "$REGION"
+
+echo "✅ API Mapping eliminado correctamente."
+# modo de uso:
+# curl -fsSL https://raw.githubusercontent.com/dcasteca/comandos/main/delete-apimapping | bash -s -- api.dev.integration.appsb.entornosb.com products/ach/creationachxpresstransfersbanks/v1 us-east-1
