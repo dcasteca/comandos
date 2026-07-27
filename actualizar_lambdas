@@ -1,0 +1,105 @@
+#!/bin/bash
+
+set -euo pipefail
+
+REGION="us-east-1"
+NEW_URL="pjwpv68bqc-vpce-0e41baf37a12f640a.execute-api.us-east-1.amazonaws.com/dev/vpce/inquirycobisvpce/get"
+
+echo "========================================"
+echo "Buscando Lambdas en $REGION..."
+echo "========================================"
+
+MARKER=""
+TOTAL=0
+UPDATED=0
+
+while true; do
+
+    if [ -z "$MARKER" ]; then
+        RESPONSE=$(aws lambda list-functions \
+            --region "$REGION" \
+            --output json)
+    else
+        RESPONSE=$(aws lambda list-functions \
+            --region "$REGION" \
+            --marker "$MARKER" \
+            --output json)
+    fi
+
+    FUNCTIONS=$(echo "$RESPONSE" | python3 -c '
+import json,sys
+r=json.load(sys.stdin)
+for f in r["Functions"]:
+    print(f["FunctionName"])
+')
+
+    while IFS= read -r FUNCTION; do
+        [ -z "$FUNCTION" ] && continue
+
+        TOTAL=$((TOTAL+1))
+
+        echo
+        echo "[$TOTAL] Revisando $FUNCTION"
+
+        ENV=$(aws lambda get-function-configuration \
+            --function-name "$FUNCTION" \
+            --region "$REGION" \
+            --query 'Environment.Variables' \
+            --output json)
+
+        HAS_VAR=$(echo "$ENV" | python3 -c '
+import json,sys
+env=json.load(sys.stdin)
+print("true" if "VPCE_PROVIDER_URL" in env else "false")
+')
+
+        if [ "$HAS_VAR" = "true" ]; then
+
+            OLD_VALUE=$(echo "$ENV" | python3 -c '
+import json,sys
+env=json.load(sys.stdin)
+print(env["VPCE_PROVIDER_URL"])
+')
+
+            echo "  VPCE_PROVIDER_URL encontrada"
+            echo "  Valor anterior:"
+            echo "    $OLD_VALUE"
+
+            NEW_ENV=$(echo "$ENV" | python3 -c "
+import json,sys
+env=json.load(sys.stdin)
+env['VPCE_PROVIDER_URL']='$NEW_URL'
+print(json.dumps({'Variables':env}))
+")
+
+            aws lambda update-function-configuration \
+                --function-name "$FUNCTION" \
+                --region "$REGION" \
+                --environment "$NEW_ENV" >/dev/null
+
+            UPDATED=$((UPDATED+1))
+
+            echo "  ✅ Actualizada"
+
+        else
+            echo "  No tiene VPCE_PROVIDER_URL"
+        fi
+
+    done <<< "$FUNCTIONS"
+
+    MARKER=$(echo "$RESPONSE" | python3 -c '
+import json,sys
+r=json.load(sys.stdin)
+print(r.get("NextMarker",""))
+')
+
+    [ -z "$MARKER" ] && break
+
+done
+
+echo
+echo "========================================"
+echo "Proceso terminado"
+echo "Funciones revisadas : $TOTAL"
+echo "Funciones actualizadas : $UPDATED"
+echo "========================================"
