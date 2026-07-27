@@ -1,0 +1,125 @@
+#!/bin/bash
+
+set -uo pipefail
+
+REGION="us-east-1"
+NEW_URL="pjwpv68bqc-vpce-0e41baf37a12f640a.execute-api.us-east-1.amazonaws.com/dev/vpce/inquirycobisvpce/get"
+
+echo "========================================"
+echo "Buscando Lambdas en $REGION..."
+echo "========================================"
+
+MARKER=""
+TOTAL=0
+UPDATED=0
+ERRORS=0
+
+while true; do
+
+    if [ -z "$MARKER" ]; then
+        RESPONSE=$(aws lambda list-functions \
+            --region "$REGION" \
+            --output json)
+    else
+        RESPONSE=$(aws lambda list-functions \
+            --region "$REGION" \
+            --marker "$MARKER" \
+            --output json)
+    fi
+
+    FUNCTIONS=$(echo "$RESPONSE" | python3 - <<'PY'
+import json,sys
+data=json.load(sys.stdin)
+for f in data.get("Functions", []):
+    print(f["FunctionName"])
+PY
+)
+
+    while IFS= read -r FUNCTION
+    do
+        [ -z "$FUNCTION" ] && continue
+
+        TOTAL=$((TOTAL+1))
+
+        echo
+        echo "[$TOTAL] Revisando $FUNCTION"
+
+        CONFIG=$(aws lambda get-function-configuration \
+            --function-name "$FUNCTION" \
+            --region "$REGION" \
+            --output json)
+
+        HAS_VAR=$(echo "$CONFIG" | python3 - <<'PY'
+import json,sys
+
+cfg=json.load(sys.stdin)
+env=cfg.get("Environment",{}).get("Variables",{})
+
+print("true" if "VPCE_PROVIDER_URL" in env else "false")
+PY
+)
+
+        if [ "$HAS_VAR" = "true" ]; then
+
+            OLD_VALUE=$(echo "$CONFIG" | python3 - <<'PY'
+import json,sys
+
+cfg=json.load(sys.stdin)
+env=cfg.get("Environment",{}).get("Variables",{})
+print(env["VPCE_PROVIDER_URL"])
+PY
+)
+
+            echo "  VPCE_PROVIDER_URL encontrada"
+            echo "  Anterior: $OLD_VALUE"
+            echo "  Nuevo   : $NEW_URL"
+
+            NEW_ENV=$(echo "$CONFIG" | python3 - <<PY
+import json,sys
+
+cfg=json.load(sys.stdin)
+env=cfg.get("Environment",{}).get("Variables",{})
+env["VPCE_PROVIDER_URL"]="$NEW_URL"
+
+print(json.dumps({"Variables":env}))
+PY
+)
+
+            if aws lambda update-function-configuration \
+                --function-name "$FUNCTION" \
+                --region "$REGION" \
+                --environment "$NEW_ENV" >/dev/null
+            then
+                UPDATED=$((UPDATED+1))
+                echo "  ✅ Actualizada"
+            else
+                ERRORS=$((ERRORS+1))
+                echo "  ❌ Error actualizando"
+            fi
+
+        else
+            echo "  No tiene VPCE_PROVIDER_URL"
+        fi
+
+    done <<< "$FUNCTIONS"
+
+    MARKER=$(echo "$RESPONSE" | python3 - <<'PY'
+import json,sys
+
+data=json.load(sys.stdin)
+print(data.get("NextMarker",""))
+PY
+)
+
+    [ -z "$MARKER" ] && break
+
+done
+
+echo
+echo "========================================"
+echo "Resumen"
+echo "========================================"
+echo "Funciones revisadas    : $TOTAL"
+echo "Funciones actualizadas : $UPDATED"
+echo "Errores                : $ERRORS"
+echo "========================================"
