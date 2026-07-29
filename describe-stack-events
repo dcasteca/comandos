@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+STACK_NAME="${1:-cfstk-0267-000-extensions-aln-417570831362}"
+REGION="${2:-us-east-1}"
+
+echo "🔍 Buscando errores de validación y fallos en el Stack: $STACK_NAME ($REGION)..."
+echo "--------------------------------------------------------------------------------"
+
+aws cloudformation describe-stack-events \
+  --stack-name "$STACK_NAME" \
+  --region "$REGION" \
+  --query "StackEvents[?ResourceStatus=='UPDATE_FAILED' || ResourceStatus=='CREATE_FAILED'].[LogicalResourceId, ResourceStatusReason]" \
+  --output table
