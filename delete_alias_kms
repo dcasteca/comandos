@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+ALIAS_NAME="${1}"
+REGION="${2}"
+
+echo "🗑️  Eliminando el alias de KMS: $ALIAS_NAME ($REGION)..."
+echo "--------------------------------------------------------------------------------"
+
+aws kms delete-alias \
+  --alias-name "$ALIAS_NAME" \
+  --region "$REGION"
+
+echo "✅ Alias $ALIAS_NAME eliminado exitosamente."
